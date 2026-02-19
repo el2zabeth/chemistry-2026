@@ -120,28 +120,20 @@ if csv_url:
                 continue
 
             # 🔥 폰트 경로 자동 탐색
-            font_path = None
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+font_path = os.path.join(BASE_DIR, "NanumGothic.ttf")
 
-            possible_paths = [
-                "NanumGothic.ttf",
-                "./NanumGothic.ttf",
-                "fonts/NanumGothic.ttf"
-            ]
-
-            for path in possible_paths:
-                if os.path.exists(path):
-                    font_path = path
-                    break
 
             try:
                 if font_path:
                     wordcloud = WordCloud(
-                        font_path=font_path,
-                        width=1400,
-                        height=600,
-                        background_color="white",
-                        colormap="viridis"
-                    ).generate(text)
+    font_path=font_path,
+    width=1400,
+    height=600,
+    background_color="white",
+    colormap="viridis"
+).generate(text)
+
                 else:
                     st.warning("⚠️ 나눔고딕 폰트를 찾지 못했습니다.")
                     st.stop()
