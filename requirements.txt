@@ -4,3 +4,5 @@ matplotlib
 plotly
 wordcloud
 streamlit-autorefresh
+qrcode
+pillow
