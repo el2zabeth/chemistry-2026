@@ -13,7 +13,7 @@ import os
 # ---------------------------
 st_autorefresh(interval=10000, key="refresh")
 
-st.set_page_config(page_title="우리 반 수업 설문", layout="wide")
+st.set_page_config(page_title="AP 화학I", layout="wide")
 
 # ---------------------------
 # 🎨 다크 테마
@@ -25,7 +25,7 @@ h1, h2, h3 { color: white; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🎓 우리 반 수업 시작 설문")
+st.title("AP 화학I")
 
 # ---------------------------
 # 🎟 참여코드 생성
