@@ -1,3 +1,8 @@
+import os
+
+st.write("현재 디렉토리 파일 목록:")
+st.write(os.listdir())
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
