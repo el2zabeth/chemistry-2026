@@ -100,51 +100,45 @@ if csv_url:
                         unsafe_allow_html=True
                     )
 
-    # =====================================================
-    # 💬 서술형 워드클라우드 (완전 안정화 버전)
-    # =====================================================
-    st.markdown("## 💬 서술형 응답")
+# ============================
+# 서술형 워드클라우드
+# ============================
+import os
 
-    for question in WORDCLOUD_QUESTIONS:
+st.markdown("## 💬 서술형 응답")
 
-        if question in df.columns:
-
-            st.subheader(question)
-
-            responses = df[question].dropna().astype(str)
-
-            text = " ".join(responses).strip()
-
-            if len(text) < 5:
-                st.info("응답이 아직 없습니다.")
-                continue
-
-            # 🔥 폰트 경로 자동 탐색
-            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 font_path = os.path.join(BASE_DIR, "NanumGothic.ttf")
 
+for question in WORDCLOUD_QUESTIONS:
 
-            try:
-                if font_path:
-                    wordcloud = WordCloud(
-    font_path=font_path,
-    width=1400,
-    height=600,
-    background_color="white",
-    colormap="viridis"
-).generate(text)
+    if question in df.columns:
 
-                else:
-                    st.warning("⚠️ 나눔고딕 폰트를 찾지 못했습니다.")
-                    st.stop()
+        st.subheader(question)
 
-            except Exception as e:
-                st.error("워드클라우드 생성 오류")
-                st.text(e)
-                st.stop()
+        responses = df[question].dropna().astype(str)
+        text = " ".join(responses).strip()
 
-            fig_wc, ax = plt.subplots(figsize=(14,6))
-            ax.imshow(wordcloud, interpolation="bilinear")
-            ax.axis("off")
+        if len(text) < 2:
+            st.info("응답이 아직 없습니다.")
+            continue
 
-            st.pyplot(fig_wc)
+        try:
+            wordcloud = WordCloud(
+                font_path=font_path,
+                width=1400,
+                height=600,
+                background_color="white",
+                colormap="viridis"
+            ).generate(text)
+
+        except Exception as e:
+            st.error("폰트 오류 발생 → NanumGothic.ttf 확인하세요.")
+            st.stop()
+
+        fig_wc, ax = plt.subplots(figsize=(14,6))
+        ax.imshow(wordcloud, interpolation="bilinear")
+        ax.axis("off")
+
+        st.pyplot(fig_wc)
+
