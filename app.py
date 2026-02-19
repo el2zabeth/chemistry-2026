@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import plotly.express as px
+import plotly.graph_objects as go
 from wordcloud import WordCloud
 from streamlit_autorefresh import st_autorefresh
 import random
@@ -11,39 +11,41 @@ import qrcode
 from io import BytesIO
 
 # ---------------------------
-# 🔄 10초 자동 새로고침
+# 자동 새로고침 (10초)
 # ---------------------------
 st_autorefresh(interval=10000, key="refresh")
 
-st.set_page_config(page_title="우리 반 수업 설문", layout="wide")
+st.set_page_config(page_title="수업 시작 설문", layout="wide")
 
-st.title("🎓 우리 반 수업 시작 설문")
+st.title("AP 화학")
 
 # ---------------------------
-# 🎟 참여코드 생성
+# 참여코드 생성
 # ---------------------------
 if "class_code" not in st.session_state:
-    st.session_state.class_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    st.session_state.class_code = ''.join(
+        random.choices(string.ascii_uppercase + string.digits, k=6)
+    )
 
 st.markdown(f"## 🎟 참여 코드: `{st.session_state.class_code}`")
 
 # ---------------------------
 # QR 코드 생성
 # ---------------------------
-form_link = st.text_input("📎 학생들에게 제공할 Google Form 링크 입력 (QR 생성용)")
+form_link = st.text_input("📎 Google Form 링크 (QR 생성용)")
 
 if form_link:
     qr = qrcode.make(form_link)
     buf = BytesIO()
     qr.save(buf)
-    st.image(buf.getvalue(), caption="📱 QR코드를 스캔하여 참여하세요", width=200)
+    st.image(buf.getvalue(), width=220)
 
 st.markdown("---")
 
-csv_url = st.text_input("📎 Google Sheets CSV URL 입력")
+csv_url = st.text_input("📎 Google Sheets CSV 링크 입력")
 
 # ---------------------------
-# 한글 폰트 설정
+# 한글 폰트
 # ---------------------------
 def get_korean_font():
     font_paths = [
@@ -60,23 +62,18 @@ if csv_url:
     try:
         df = pd.read_csv(csv_url)
 
-        # 참여코드 필터링
+        # 타임스탬프 제거
+        df = df.loc[:, ~df.columns.str.contains("타임")]
+
+        # 참여코드 필터
         if "코드" in df.columns:
             df = df[df["코드"] == st.session_state.class_code]
 
         st.success(f"현재 응답 수: {len(df)} 명")
 
-        # 반별 저장 기능
-        save_folder = "saved_results"
-        os.makedirs(save_folder, exist_ok=True)
-        save_path = f"{save_folder}/{st.session_state.class_code}.csv"
-        df.to_csv(save_path, index=False)
+        columns = df.columns.tolist()
 
-        columns = [c for c in df.columns if c != "코드"]
-
-        # -----------------------------
-        # 질문 분류
-        # -----------------------------
+        # 객관식/서술형 자동 분류
         objective_cols = []
         subjective_cols = []
 
@@ -86,52 +83,59 @@ if csv_url:
             else:
                 subjective_cols.append(col)
 
-        # ==========================
-        # 📊 객관식 2개 가로 배치
-        # ==========================
+        # =========================
+        # 📊 객관식 2개 가로배치
+        # =========================
         st.markdown("## 📊 객관식 응답")
 
-        colA, colB = st.columns(2)
+        col1, col2 = st.columns(2)
 
         for i in range(min(2, len(objective_cols))):
-            counts = df[objective_cols[i]].value_counts().reset_index()
-            counts.columns = ["선택지", "응답 수"]
+            col_name = objective_cols[i]
+            counts = df[col_name].value_counts()
 
-            fig = px.pie(
-                counts,
-                names="선택지",
-                values="응답 수",
-                hole=0.4
-            )
-
-            fig.update_traces(
-                textfont_size=18,
-                textinfo="percent+label"
+            fig = go.Figure(
+                data=[
+                    go.Pie(
+                        labels=counts.index,
+                        values=counts.values,
+                        hole=0.5,
+                        textinfo="percent",   # 퍼센트만
+                        textfont_size=28
+                    )
+                ]
             )
 
             fig.update_layout(
-                title_font_size=22
+                showlegend=True,
+                legend=dict(
+                    font=dict(size=20)  # 범례 크게
+                ),
+                title=dict(
+                    text=col_name,
+                    font=dict(size=26)
+                )
             )
 
             if i == 0:
-                colA.subheader(objective_cols[i])
-                colA.plotly_chart(fig, use_container_width=True)
+                col1.plotly_chart(fig, use_container_width=True)
             else:
-                colB.subheader(objective_cols[i])
-                colB.plotly_chart(fig, use_container_width=True)
+                col2.plotly_chart(fig, use_container_width=True)
 
-        # ==========================
-        # 💬 서술형 2개 표시
-        # ==========================
+        # =========================
+        # 💬 서술형 응답 2개
+        # =========================
         st.markdown("## 💬 서술형 응답")
 
         for col in subjective_cols[:2]:
             st.subheader(col)
 
-            responses = df[col].dropna()
+            responses = df[col].dropna().astype(str)
 
             if len(responses) > 0:
-                freq = responses.value_counts().to_dict()
+
+                # 🔥 모든 텍스트를 하나로 합쳐 워드클라우드 생성
+                text = " ".join(responses)
 
                 wordcloud = WordCloud(
                     font_path=font_path,
@@ -139,20 +143,21 @@ if csv_url:
                     height=600,
                     background_color="white",
                     colormap="viridis",
-                    max_words=100
-                ).generate_from_frequencies(freq)
+                    max_words=150
+                ).generate(text)
 
-                fig_wc, ax_wc = plt.subplots(figsize=(14,6))
-                ax_wc.imshow(wordcloud, interpolation="bilinear")
-                ax_wc.axis("off")
+                fig_wc, ax = plt.subplots(figsize=(14,6))
+                ax.imshow(wordcloud, interpolation="bilinear")
+                ax.axis("off")
 
                 st.pyplot(fig_wc)
+
             else:
                 st.info("아직 응답이 없습니다.")
 
     except Exception as e:
-        st.error("CSV 오류 또는 공개 설정 문제")
+        st.error("CSV 오류 또는 공유 설정 문제")
         st.text(str(e))
 
 else:
-    st.info("CSV 링크를 입력하면 실시간으로 4개 질문이 모두 표시됩니다.")
+    st.info("CSV 링크를 입력하면 자동으로 표시됩니다.")
