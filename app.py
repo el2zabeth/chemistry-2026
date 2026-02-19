@@ -6,15 +6,20 @@ from wordcloud import WordCloud
 from streamlit_autorefresh import st_autorefresh
 import qrcode
 from io import BytesIO
+import os
 
 # -----------------------------
-# 자동 새로고침
+# 기본 설정
 # -----------------------------
-st_autorefresh(interval=10000, key="refresh")
-
 st.set_page_config(layout="wide")
 st.title("🎓 AP화학 수업 시작 설문 대시보드")
 
+# 자동 새로고침 (10초)
+st_autorefresh(interval=10000, key="refresh")
+
+# -----------------------------
+# 입력 영역
+# -----------------------------
 csv_url = st.text_input("📎 Google Sheets CSV 링크 입력")
 form_url = st.text_input("📱 학생 참여용 Google Form 링크 (QR 생성용)")
 
@@ -25,8 +30,8 @@ if form_url:
     qr = qrcode.make(form_url)
     buf = BytesIO()
     qr.save(buf)
-    st.image(buf.getvalue(), width=200)
-    st.markdown("### 📌 위 QR을 학생들에게 보여주세요")
+    st.image(buf.getvalue(), width=220)
+    st.markdown("### 📌 학생들에게 위 QR코드를 보여주세요")
 
 # -----------------------------
 # 질문 설정
@@ -42,6 +47,12 @@ WORDCLOUD_QUESTIONS = [
 ]
 
 # -----------------------------
+# 폰트 경로 자동 인식
+# -----------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_PATH = os.path.join(BASE_DIR, "NanumGothic.ttf")
+
+# -----------------------------
 # 데이터 로드
 # -----------------------------
 if csv_url:
@@ -49,15 +60,16 @@ if csv_url:
     try:
         df = pd.read_csv(csv_url)
     except:
-        st.error("CSV 링크를 확인해주세요.")
+        st.error("❌ CSV 링크를 다시 확인해주세요.")
         st.stop()
 
-    df = df.loc[:, ~df.columns.str.contains("타임")]
+    # 타임스탬프 제거
+    df = df.loc[:, ~df.columns.str.contains("타임|Timestamp")]
 
     st.success(f"현재 응답 수: {len(df)} 명")
 
     # ============================
-    # 객관식 원그래프
+    # 📊 객관식 원그래프
     # ============================
     st.markdown("## 📊 객관식 응답")
 
@@ -74,16 +86,16 @@ if csv_url:
                     go.Pie(
                         labels=counts.index,
                         values=counts.values,
-                        hole=0.5,
-                        textinfo="percent",
-                        textfont_size=36
+                        hole=0.45,
+                        textinfo="percent+label",
+                        textfont_size=30
                     )
                 ]
             )
 
             fig.update_layout(
-                legend=dict(font=dict(size=22)),
-                title=dict(text=question, font=dict(size=26))
+                title=dict(text=question, font=dict(size=26)),
+                legend=dict(font=dict(size=20))
             )
 
             if i == 0:
@@ -91,10 +103,20 @@ if csv_url:
             else:
                 col2.plotly_chart(fig, use_container_width=True)
 
+        else:
+            if i == 0:
+                col1.warning(f"'{question}' 열을 찾을 수 없습니다.")
+            else:
+                col2.warning(f"'{question}' 열을 찾을 수 없습니다.")
+
     # ============================
-    # 서술형 워드클라우드
+    # 💬 서술형 워드클라우드
     # ============================
     st.markdown("## 💬 서술형 응답")
+
+    if not os.path.exists(FONT_PATH):
+        st.error("❌ NanumGothic.ttf 파일이 프로젝트에 없습니다.")
+        st.stop()
 
     for question in WORDCLOUD_QUESTIONS:
 
@@ -107,30 +129,25 @@ if csv_url:
             text = " ".join(responses).strip()
 
             if len(text) < 3:
-                st.info("응답이 아직 없습니다.")
+                st.info("아직 응답이 없습니다.")
                 continue
 
-            # 🔥 폰트 예외처리 포함
-            try:
-                wordcloud = WordCloud(
-                    font_path="NanumGothic.ttf",  # 프로젝트에 넣으면 사용
-                    width=1400,
-                    height=600,
-                    background_color="white",
-                    colormap="viridis"
-                ).generate(text)
+            wordcloud = WordCloud(
+                font_path=FONT_PATH,
+                width=1600,
+                height=700,
+                background_color="white",
+                colormap="viridis",
+                max_words=200,
+                min_font_size=15
+            ).generate(text)
 
-            except:
-                # 폰트 없으면 기본 폰트 사용 (한글 깨질 수 있음)
-                wordcloud = WordCloud(
-                    width=1400,
-                    height=600,
-                    background_color="white",
-                    colormap="viridis"
-                ).generate(text)
-
-            fig_wc, ax = plt.subplots(figsize=(14,6))
+            fig_wc, ax = plt.subplots(figsize=(16,7))
             ax.imshow(wordcloud, interpolation="bilinear")
             ax.axis("off")
 
             st.pyplot(fig_wc)
+
+        else:
+            st.warning(f"'{question}' 열을 찾을 수 없습니다.")
+
