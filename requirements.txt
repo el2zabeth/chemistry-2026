@@ -1,8 +1,6 @@
 streamlit
 pandas
 matplotlib
-matplotlib-venn
-wordcloud
 plotly
-scipy
+wordcloud
 streamlit-autorefresh
