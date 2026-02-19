@@ -6,110 +6,131 @@ from wordcloud import WordCloud
 from streamlit_autorefresh import st_autorefresh
 import os
 
+# -----------------------------
+# 🔄 10초 자동 새로고침
+# -----------------------------
 st_autorefresh(interval=10000, key="refresh")
 
 st.set_page_config(layout="wide")
-st.title("🎓 수업 시작 설문 대시보드")
+st.title("🎓 AP화학 수업 시작 설문 대시보드")
 
 csv_url = st.text_input("📎 Google Sheets CSV 링크 입력")
 
 # -----------------------------
-# 한글 폰트 설정
+# 질문 고정 설정
+# -----------------------------
+PIE_QUESTIONS = [
+    "선행학습 관련",
+    "원하는 수업 수준"
+]
+
+WORDCLOUD_QUESTIONS = [
+    "AP화학 수업을 대하는 나의 마음가짐",
+    "선생님께 바라는 점"
+]
+
+# -----------------------------
+# 한글 폰트 설정 (Streamlit Cloud 대응)
 # -----------------------------
 font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
 
+# -----------------------------
+# 데이터 불러오기
+# -----------------------------
 if csv_url:
-    df = pd.read_csv(csv_url)
+
+    try:
+        df = pd.read_csv(csv_url)
+    except:
+        st.error("CSV 링크를 확인해주세요.")
+        st.stop()
 
     # 타임스탬프 제거
     df = df.loc[:, ~df.columns.str.contains("타임")]
 
-    # 코드 컬럼 제거
-    df = df.loc[:, ~df.columns.str.contains("코드")]
-
     st.success(f"현재 응답 수: {len(df)} 명")
 
-    columns = df.columns.tolist()
-
-    objective_cols = []
-    subjective_cols = []
-
-    # 🔥 새 분류 방식
-    for col in columns:
-        sample_text = df[col].dropna().astype(str)
-
-        if len(sample_text) == 0:
-            continue
-
-        avg_length = sample_text.str.len().mean()
-
-        # 평균 글자수 기준
-        if avg_length < 15:
-            objective_cols.append(col)
-        else:
-            subjective_cols.append(col)
-
-    # ============================
-    # 📊 객관식 (최대 2개 가로배치)
-    # ============================
+    # =============================
+    # 📊 객관식 원그래프 (가로 2개)
+    # =============================
     st.markdown("## 📊 객관식 응답")
 
     col1, col2 = st.columns(2)
 
-    for i in range(min(2, len(objective_cols))):
-        col_name = objective_cols[i]
-        counts = df[col_name].value_counts()
+    for i, question in enumerate(PIE_QUESTIONS):
 
-        fig = go.Figure(
-            data=[
-                go.Pie(
-                    labels=counts.index,
-                    values=counts.values,
-                    hole=0.5,
-                    textinfo="percent",
-                    textfont_size=28
+        if question in df.columns:
+
+            counts = df[question].dropna().value_counts()
+
+            if len(counts) == 0:
+                continue
+
+            fig = go.Figure(
+                data=[
+                    go.Pie(
+                        labels=counts.index,
+                        values=counts.values,
+                        hole=0.5,
+                        textinfo="percent",
+                        textfont_size=34
+                    )
+                ]
+            )
+
+            fig.update_layout(
+                legend=dict(
+                    font=dict(size=22)
+                ),
+                title=dict(
+                    text=question,
+                    font=dict(size=26)
                 )
-            ]
-        )
+            )
 
-        fig.update_layout(
-            legend=dict(font=dict(size=20)),
-            title=dict(text=col_name, font=dict(size=26))
-        )
+            if i == 0:
+                col1.plotly_chart(fig, use_container_width=True)
+            else:
+                col2.plotly_chart(fig, use_container_width=True)
 
-        if i == 0:
-            col1.plotly_chart(fig, use_container_width=True)
-        else:
-            col2.plotly_chart(fig, use_container_width=True)
-
-    # ============================
+    # =============================
     # 💬 서술형 워드클라우드
-    # ============================
+    # =============================
     st.markdown("## 💬 서술형 응답")
 
-    for col in subjective_cols[:2]:
-        st.subheader(col)
+    for question in WORDCLOUD_QUESTIONS:
 
-        responses = df[col].dropna().astype(str)
+        if question in df.columns:
 
-        if len(responses) > 0:
-            text = " ".join(responses)
+            st.subheader(question)
 
-            wordcloud = WordCloud(
-                font_path=font_path,
-                width=1400,
-                height=600,
-                background_color="white",
-                colormap="viridis",
-                max_words=200,
-                min_font_size=10
-            ).generate(text)
+            responses = df[question].dropna().astype(str)
 
-            fig_wc, ax = plt.subplots(figsize=(14,6))
-            ax.imshow(wordcloud, interpolation="bilinear")
-            ax.axis("off")
+            # 텍스트 합치기
+            text = " ".join(responses).strip()
 
-            st.pyplot(fig_wc)
+            # 🔥 응답 부족 시 안전 처리
+            if len(text) < 5:
+                st.info("응답이 아직 충분하지 않습니다.")
+                continue
 
-        else:
-            st.info("응답이 아직 없습니다.")
+            try:
+                wordcloud = WordCloud(
+                    font_path=font_path,
+                    width=1400,
+                    height=600,
+                    background_color="white",
+                    colormap="viridis",
+                    max_words=200,
+                    min_font_size=12
+                ).generate(text)
+
+                fig_wc, ax = plt.subplots(figsize=(14,6))
+                ax.imshow(wordcloud, interpolation="bilinear")
+                ax.axis("off")
+
+                st.pyplot(fig_wc)
+
+            except Exception as e:
+                st.error("워드클라우드 생성 중 오류 발생")
+                st.write(e)
